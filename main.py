@@ -3,18 +3,19 @@ import time
 import shutil
 import re
 import requests
+from urllib.parse import urljoin, urlparse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
-from urllib.parse import urljoin
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, COMM, TCON
 
 HEADLESS = True
 CLASSIFY = True
+ARTWORK = True
 
 styles = [
     "Deep House",
@@ -51,8 +52,10 @@ def create_chrome_opts():
 
 def get_genre_from_tags(track_tags, style_list):
     for style in reversed(style_list):
+        normalized_style = style.replace(" ", "").lower()
         for tag in track_tags:
-            if style.lower() in tag.lower():
+            normalized_tag = tag.replace(" ", "").lower()
+            if normalized_style in normalized_tag:
                 return style
     return None
 
@@ -232,13 +235,14 @@ def process_track_item(track_url, out_folder):
         time.sleep(1)
         shutil.move(dl_file, new_mp3_path)
         print("MP3 téléchargé et déplacé vers:", new_mp3_path)
-        art_path, sc_tags, det_genre = download_artwork_file(track_url, mp3_new_name, out_folder)
-        if art_path and os.path.exists(art_path):
-            add_cover_art(new_mp3_path, art_path)
-            print("Artwork intégré dans:", new_mp3_path)
-            os.remove(art_path)
-        else:
-            print("Artwork non intégré pour:", track_url)
+        if ARTWORK:
+            art_path, sc_tags, det_genre = download_artwork_file(track_url, mp3_new_name, out_folder)
+            if art_path and os.path.exists(art_path):
+                add_cover_art(new_mp3_path, art_path)
+                print("Artwork intégré dans:", new_mp3_path)
+                os.remove(art_path)
+            else:
+                print("Artwork non intégré pour:", track_url)
         if CLASSIFY:
             if sc_tags:
                 add_comment_tags(new_mp3_path, sc_tags)
@@ -252,9 +256,15 @@ def process_track_item(track_url, out_folder):
     driver.quit()
 
 if __name__ == "__main__":
-    playlist_url = input("Entrez l'URL de la playlist SoundCloud: ")
+    input_url = input("Entrez l'URL SoundCloud (playlist ou son unique): ")
     output_folder = input("Entrez le dossier d'output: ")
-    urls = fetch_playlist_urls(playlist_url)
-    print(len(urls), "musiques à télécharger")
+    parsed = urlparse(input_url)
+    path_comps = [comp for comp in parsed.path.split('/') if comp]
+    # Si le deuxième élément (index 1) est "sets", c'est une playlist
+    if len(path_comps) > 1 and path_comps[1].lower() == "sets":
+        urls = fetch_playlist_urls(input_url)
+    else:
+        urls = [input_url]
+    print(len(urls), "musique(s) à télécharger")
     for url in urls:
         process_track_item(url, output_folder)
