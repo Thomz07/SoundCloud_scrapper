@@ -13,7 +13,7 @@ from selenium.webdriver.chrome.service import Service
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, COMM, TCON
 
-HEADLESS = True
+HEADLESS = False
 CLASSIFY = True
 ARTWORK = True
 
@@ -74,6 +74,32 @@ def fetch_playlist_urls(playlist_url):
             break
         last_height = new_height
     elems = driver.find_elements(By.CSS_SELECTOR, "a.trackItem__trackTitle")
+    urls = []
+    for e in elems:
+        href = e.get_attribute("href")
+        if href:
+            urls.append(urljoin("https://soundcloud.com", href))
+    driver.quit()
+    return list(set(urls))
+
+def fetch_artist_tracks(artist_url):
+    opts = create_chrome_opts()
+    service = Service(log_path=os.devnull)
+    driver = webdriver.Chrome(service=service, options=opts)
+    driver.get(artist_url)
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "a.sc-link-primary.soundTitle__title.sc-link-dark.sc-text-h4"))
+    )
+    last_height = driver.execute_script("return document.body.scrollHeight")
+    while True:
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(2)
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
+
+    elems = driver.find_elements(By.CSS_SELECTOR, "a.sc-link-primary.soundTitle__title.sc-link-dark.sc-text-h4")
     urls = []
     for e in elems:
         href = e.get_attribute("href")
@@ -243,6 +269,8 @@ def process_track_item(track_url, out_folder):
                 os.remove(art_path)
             else:
                 print("Artwork non intégré pour:", track_url)
+        else:
+            sc_tags, det_genre = [], None
         if CLASSIFY:
             if sc_tags:
                 add_comment_tags(new_mp3_path, sc_tags)
@@ -256,15 +284,18 @@ def process_track_item(track_url, out_folder):
     driver.quit()
 
 if __name__ == "__main__":
-    input_url = input("Entrez l'URL SoundCloud (playlist ou son unique): ")
+    input_url = input("Entrez l'URL SoundCloud (playlist, artiste ou son unique): ")
     output_folder = input("Entrez le dossier d'output: ")
     parsed = urlparse(input_url)
     path_comps = [comp for comp in parsed.path.split('/') if comp]
-    # Si le deuxième élément (index 1) est "sets", c'est une playlist
-    if len(path_comps) > 1 and path_comps[1].lower() == "sets":
+
+    if len(path_comps) > 0 and path_comps[-1].lower() in ("tracks", "popular-tracks"):
+        urls = fetch_artist_tracks(input_url)
+    elif len(path_comps) > 1 and path_comps[1].lower() == "sets":
         urls = fetch_playlist_urls(input_url)
     else:
         urls = [input_url]
+
     print(len(urls), "musique(s) à télécharger")
     for url in urls:
         process_track_item(url, output_folder)
