@@ -13,7 +13,7 @@ from selenium.webdriver.chrome.service import Service
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, COMM, TCON
 
-HEADLESS = False
+HEADLESS = True
 CLASSIFY = True
 ARTWORK = True
 
@@ -98,7 +98,6 @@ def fetch_artist_tracks(artist_url):
         if new_height == last_height:
             break
         last_height = new_height
-
     elems = driver.find_elements(By.CSS_SELECTOR, "a.sc-link-primary.soundTitle__title.sc-link-dark.sc-text-h4")
     urls = []
     for e in elems:
@@ -232,6 +231,19 @@ def add_genre_if_missing(mp3_path, genre):
         audio.tags.add(TCON(encoding=3, text=genre))
         audio.save(v2_version=3)
 
+def update_downloaded_file(file_path, track_url):
+    with open(file_path, "a", encoding="utf-8") as f:
+        f.write(track_url + "\n")
+
+def get_downloaded_urls(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def normalize_url(url):
+    return url.split('?')[0]
+
 def process_track_item(track_url, out_folder):
     opts = create_chrome_opts()
     service = Service(log_path=os.devnull)
@@ -269,8 +281,6 @@ def process_track_item(track_url, out_folder):
                 os.remove(art_path)
             else:
                 print("Artwork non intégré pour:", track_url)
-        else:
-            sc_tags, det_genre = [], None
         if CLASSIFY:
             if sc_tags:
                 add_comment_tags(new_mp3_path, sc_tags)
@@ -288,14 +298,23 @@ if __name__ == "__main__":
     output_folder = input("Entrez le dossier d'output: ")
     parsed = urlparse(input_url)
     path_comps = [comp for comp in parsed.path.split('/') if comp]
-
-    if len(path_comps) > 0 and path_comps[-1].lower() in ("tracks", "popular-tracks"):
-        urls = fetch_artist_tracks(input_url)
-    elif len(path_comps) > 1 and path_comps[1].lower() == "sets":
+    
+    downloaded_file = os.path.join(output_folder, "downloaded_urls.txt")
+    
+    if len(path_comps) > 1 and path_comps[1].lower() == "sets":
         urls = fetch_playlist_urls(input_url)
+    elif len(path_comps) > 0 and path_comps[-1].lower() in ("tracks", "popular-tracks"):
+        urls = fetch_artist_tracks(input_url)
     else:
         urls = [input_url]
-
+    
     print(len(urls), "musique(s) à télécharger")
+    downloaded_urls = get_downloaded_urls(downloaded_file)
+    
     for url in urls:
+        normalized = normalize_url(url)
+        if any(normalize_url(url) == normalize_url(d) for d in downloaded_urls):
+            print("Déjà téléchargé:", url)
+            continue
         process_track_item(url, output_folder)
+        update_downloaded_file(downloaded_file, url)
