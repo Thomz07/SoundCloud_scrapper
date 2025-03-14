@@ -12,6 +12,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, COMM, TCON
+from tkinter import Tk
+from tkinter.filedialog import askdirectory
 
 HEADLESS = True
 CLASSIFY = True
@@ -295,7 +297,8 @@ def process_track_item(track_url, out_folder):
 
 if __name__ == "__main__":
     input_url = input("Entrez l'URL SoundCloud (playlist, artiste ou son unique): ")
-    output_folder = input("Entrez le dossier d'output: ")
+    print("Sélectionnez le dossier d'output dans a fenêtre qui vient d'apparaitre")
+    output_folder = askdirectory(title="Sélectionnez le dossier où télécharger les musiques")
     parsed = urlparse(input_url)
     path_comps = [comp for comp in parsed.path.split('/') if comp]
     
