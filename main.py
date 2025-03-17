@@ -14,7 +14,7 @@ from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, COMM, TCON
 from tkinter.filedialog import askdirectory
 
-HEADLESS = False
+HEADLESS = True
 CLASSIFY = True
 ARTWORK = True
 
