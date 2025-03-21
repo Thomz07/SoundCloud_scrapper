@@ -1,4 +1,5 @@
 selenium
 mutagen
 requests
-tkinter
+tk
+webdriver_manager
