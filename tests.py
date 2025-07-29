@@ -1,3 +1,14 @@
-from main import collect_playlist_track_urls
+from pathlib import Path
+from mutagen.id3 import ID3, ID3NoHeaderError, COMM, Encoding
 
-print(collect_playlist_track_urls("https://soundcloud.com/laffayclochette/sets/240a1/s-XLT6RRF5akR?si=8a379fb90a9840f3820f089980c05a34&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing"))
+def set_comment(mp3_path, text):
+    mp3_path = Path(mp3_path)
+    try:
+        tags = ID3(mp3_path)
+    except ID3NoHeaderError:
+        tags = ID3()
+    tags.delall('COMM')
+    tags.add(COMM(encoding=Encoding.UTF16, lang='eng', desc='', text=text))
+    tags.save(mp3_path, v1=0, v2_version=3)  # pas d’ID3v1, ID3 v2.3
+
+set_comment(r'/Volumes/MUSIC/Music_thomas/Hard trance/01 Funk Tribu - Viento Extended Mix ARTCORE Records.mp3', 'This is a test comment.')
